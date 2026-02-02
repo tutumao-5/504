@@ -1,0 +1,5 @@
+{
+  "name": "504班摘星龙虎榜",
+  "description": "一个用于班级管理的React应用，包含学生积分、战队榜单、抽奖系统和数据分析功能。",
+  "requestFramePermissions": []
+}
