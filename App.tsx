@@ -84,65 +84,78 @@ const StarDisplay = ({ count }: { count: number }) => {
 
 const TierIconWrapper = ({ icon: Icon, size, className }: { icon: any, size: number, className?: string }) => <Icon size={size} className={className} />;
 
-export default function App() {
+// --- App Wrapper (Handles Mode Switching & Data Isolation) ---
+export default function AppWrapper() {
+  const [appMode, setAppMode] = useState<'final' | 'semester'>('final');
+  
+  return (
+    <AppCore key={appMode} appMode={appMode} setAppMode={setAppMode} />
+  );
+}
+
+// --- Main App Component ---
+function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAppMode: (mode: 'final' | 'semester') => void }) {
+  // 数据隔离辅助函数：学期模式下自动为 localStorage 键值添加 _semester 后缀
+  const getStorageKey = (key: string) => appMode === 'final' ? key : `${key}_semester`;
+
   const [students, setStudents] = useState<Student[]>(() => {
-    const saved = localStorage.getItem('504_stars_data');
+    const saved = localStorage.getItem(getStorageKey('504_stars_data'));
     const parsed = saved ? JSON.parse(saved) : INITIAL_STUDENTS;
     return parsed.map((s: any) => ({ ...s, spent: s.spent || 0 }));
   });
   
   const [teamNames, setTeamNames] = useState<{[key: number]: string}>(() => {
-    const saved = localStorage.getItem('504_team_names');
+    const saved = localStorage.getItem(getStorageKey('504_team_names'));
     return saved ? JSON.parse(saved) : {};
   });
 
   const [leaders, setLeaders] = useState<{[key: number]: number}>(() => {
-    const saved = localStorage.getItem('504_team_leaders');
+    const saved = localStorage.getItem(getStorageKey('504_team_leaders'));
     return saved ? JSON.parse(saved) : {};
   });
 
   const [starLogs, setStarLogs] = useState<StarLogs>(() => {
-    const saved = localStorage.getItem('504_star_logs');
+    const saved = localStorage.getItem(getStorageKey('504_star_logs'));
     return saved ? JSON.parse(saved) : {};
   });
 
   const [lotteryHistory, setLotteryHistory] = useState<LotteryRecord[]>(() => {
-    const saved = localStorage.getItem('504_lottery_history');
+    const saved = localStorage.getItem(getStorageKey('504_lottery_history'));
     return saved ? JSON.parse(saved) : [];
   });
 
   const [pendingPrizes, setPendingPrizes] = useState<PendingPrize[]>(() => {
-    const saved = localStorage.getItem('504_pending_prizes');
+    const saved = localStorage.getItem(getStorageKey('504_pending_prizes'));
     return saved ? JSON.parse(saved) : [];
   });
 
   const [redeemedHistory, setRedeemedHistory] = useState<PendingPrize[]>(() => {
-    const saved = localStorage.getItem('504_redeemed_history');
+    const saved = localStorage.getItem(getStorageKey('504_redeemed_history'));
     return saved ? JSON.parse(saved) : [];
   });
 
   const [teamBonuses, setTeamBonuses] = useState<{[key: string]: boolean}>(() => {
-    const saved = localStorage.getItem('504_team_bonuses');
+    const saved = localStorage.getItem(getStorageKey('504_team_bonuses'));
     return saved ? JSON.parse(saved) : {};
   });
 
   const [dailyChampions, setDailyChampions] = useState<{[key: number]: string}>(() => {
-    const saved = localStorage.getItem('504_daily_champions');
+    const saved = localStorage.getItem(getStorageKey('504_daily_champions'));
     return saved ? JSON.parse(saved) : {};
   });
 
   const [maxDay, setMaxDay] = useState<number>(() => {
-    const saved = localStorage.getItem('504_max_day');
+    const saved = localStorage.getItem(getStorageKey('504_max_day'));
     return saved ? parseInt(saved) : 1;
   });
 
   const [groupConfig, setGroupConfig] = useState<GroupConfig[]>(() => {
-    const saved = localStorage.getItem('504_group_config');
+    const saved = localStorage.getItem(getStorageKey('504_group_config'));
     return saved ? JSON.parse(saved) : INITIAL_GROUP_CONFIG;
   });
 
   const [prizes, setPrizes] = useState<PrizeDB>(() => {
-      const saved = localStorage.getItem('504_prize_db');
+      const saved = localStorage.getItem(getStorageKey('504_prize_db'));
       return saved ? JSON.parse(saved) : INITIAL_PRIZE_DB;
   });
   
@@ -184,18 +197,18 @@ export default function App() {
 
   const totalClassStars = useMemo(() => students.reduce((acc, s) => acc + s.stars, 0), [students]);
 
-  useEffect(() => { localStorage.setItem('504_stars_data', JSON.stringify(students)); }, [students]);
-  useEffect(() => { localStorage.setItem('504_team_names', JSON.stringify(teamNames)); }, [teamNames]);
-  useEffect(() => { localStorage.setItem('504_team_leaders', JSON.stringify(leaders)); }, [leaders]);
-  useEffect(() => { localStorage.setItem('504_star_logs', JSON.stringify(starLogs)); }, [starLogs]);
-  useEffect(() => { localStorage.setItem('504_lottery_history', JSON.stringify(lotteryHistory)); }, [lotteryHistory]);
-  useEffect(() => { localStorage.setItem('504_pending_prizes', JSON.stringify(pendingPrizes)); }, [pendingPrizes]);
-  useEffect(() => { localStorage.setItem('504_redeemed_history', JSON.stringify(redeemedHistory)); }, [redeemedHistory]);
-  useEffect(() => { localStorage.setItem('504_team_bonuses', JSON.stringify(teamBonuses)); }, [teamBonuses]);
-  useEffect(() => { localStorage.setItem('504_daily_champions', JSON.stringify(dailyChampions)); }, [dailyChampions]);
-  useEffect(() => { localStorage.setItem('504_max_day', maxDay.toString()); }, [maxDay]);
-  useEffect(() => { localStorage.setItem('504_group_config', JSON.stringify(groupConfig)); }, [groupConfig]);
-  useEffect(() => { localStorage.setItem('504_prize_db', JSON.stringify(prizes)); }, [prizes]);
+  useEffect(() => { localStorage.setItem(getStorageKey('504_stars_data'), JSON.stringify(students)); }, [students, appMode]);
+  useEffect(() => { localStorage.setItem(getStorageKey('504_team_names'), JSON.stringify(teamNames)); }, [teamNames, appMode]);
+  useEffect(() => { localStorage.setItem(getStorageKey('504_team_leaders'), JSON.stringify(leaders)); }, [leaders, appMode]);
+  useEffect(() => { localStorage.setItem(getStorageKey('504_star_logs'), JSON.stringify(starLogs)); }, [starLogs, appMode]);
+  useEffect(() => { localStorage.setItem(getStorageKey('504_lottery_history'), JSON.stringify(lotteryHistory)); }, [lotteryHistory, appMode]);
+  useEffect(() => { localStorage.setItem(getStorageKey('504_pending_prizes'), JSON.stringify(pendingPrizes)); }, [pendingPrizes, appMode]);
+  useEffect(() => { localStorage.setItem(getStorageKey('504_redeemed_history'), JSON.stringify(redeemedHistory)); }, [redeemedHistory, appMode]);
+  useEffect(() => { localStorage.setItem(getStorageKey('504_team_bonuses'), JSON.stringify(teamBonuses)); }, [teamBonuses, appMode]);
+  useEffect(() => { localStorage.setItem(getStorageKey('504_daily_champions'), JSON.stringify(dailyChampions)); }, [dailyChampions, appMode]);
+  useEffect(() => { localStorage.setItem(getStorageKey('504_max_day'), maxDay.toString()); }, [maxDay, appMode]);
+  useEffect(() => { localStorage.setItem(getStorageKey('504_group_config'), JSON.stringify(groupConfig)); }, [groupConfig, appMode]);
+  useEffect(() => { localStorage.setItem(getStorageKey('504_prize_db'), JSON.stringify(prizes)); }, [prizes, appMode]);
 
   useEffect(() => {
     if (selectedDay > maxDay) {
@@ -823,11 +836,29 @@ export default function App() {
 
       <nav className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50 shadow-sm relative z-20">
         <div className="max-w-5xl mx-auto px-4 py-3 flex justify-between items-center">
-          <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setViewMode('dashboard')}>
-            <div className="bg-indigo-600 p-1.5 rounded-lg text-white shadow-lg shadow-indigo-200">
-              <Star className="w-5 h-5 fill-current animate-pulse" />
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-3 cursor-pointer" onClick={() => setViewMode('dashboard')}>
+              <div className="bg-indigo-600 p-1.5 rounded-lg text-white shadow-lg shadow-indigo-200">
+                <Star className="w-5 h-5 fill-current animate-pulse" />
+              </div>
+              <h1 className="text-xl font-black tracking-tight text-slate-800">504班 · 摘星龙虎榜</h1>
             </div>
-            <h1 className="text-xl font-black tracking-tight text-slate-800">504班 · 摘星龙虎榜</h1>
+            
+            {/* 模式切换开关 */}
+            <div className="hidden sm:flex bg-slate-100 p-1 rounded-full border border-slate-200 shadow-inner items-center ml-2">
+              <button
+                onClick={() => setAppMode('final')}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${appMode === 'final' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                🏁 期末冲刺版
+              </button>
+              <button
+                onClick={() => setAppMode('semester')}
+                className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center ${appMode === 'semester' ? 'bg-gradient-to-r from-emerald-400 to-teal-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
+              >
+                <Sparkles size={12} className="mr-1" /> 学期常规版
+              </button>
+            </div>
           </div>
           <div className="flex gap-2">
             <button 
@@ -1022,7 +1053,7 @@ export default function App() {
                                     <span><AlertCircle size={14} className="inline mr-1"/> 无法保存：请确保所有奖池概率总和均为 100%</span>
                                 }
                             </div>
-                            <button onClick={() => { setIsEditingPrizes(false); setPrizes(JSON.parse(localStorage.getItem('504_prize_db') || JSON.stringify(INITIAL_PRIZE_DB))); }} className="px-6 py-3 rounded-xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200">
+                            <button onClick={() => { setIsEditingPrizes(false); setPrizes(JSON.parse(localStorage.getItem(getStorageKey('504_prize_db')) || JSON.stringify(INITIAL_PRIZE_DB))); }} className="px-6 py-3 rounded-xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200">
                                 取消修改
                             </button>
                             <button 
