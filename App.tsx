@@ -23,6 +23,43 @@ import {
 } from './types';
 import { generateAIContent } from './services/aiService';
 
+// --- 学期常规版 专属静态配置 (Semester Mode Configs) ---
+const SEMESTER_ACTION_REASONS = [
+  { label: '作业全对', score: 1, type: 'success' },
+  { label: '卷面极佳', score: 1, type: 'success' },
+  { label: '订正及时', score: 1, type: 'success' },
+  { label: '攻克每周一题', score: 3, type: 'warning' },
+  { label: '提出优质问题', score: 3, type: 'warning' },
+  { label: '一题多解', score: 3, type: 'warning' },
+  { label: '测验满分大进步', score: 5, type: 'orange' },
+  { label: '担任小老师', score: 5, type: 'orange' },
+  { label: '违规乱加分', score: -3, type: 'danger' }
+];
+
+const SEMESTER_POOL_METADATA: Record<string, any> = {
+  bronze: { title: "星尘补给袋", cost: 20, icon: Package, gradient: "from-slate-400 to-slate-600", iconColor: "text-white", shadow: "shadow-slate-200", slogan: "基础奖励包，人人可及" },
+  silver: { title: "银河寻宝图", cost: 40, icon: Sparkles, gradient: "from-indigo-400 to-purple-500", iconColor: "text-white", shadow: "shadow-indigo-200", slogan: "进阶奖励，需要持续努力" },
+  gold: { title: "宇宙主宰匣", cost: 60, icon: Crown, gradient: "from-amber-400 to-orange-500", iconColor: "text-white", shadow: "shadow-amber-200", slogan: "终极特权，强者的证明" }
+};
+
+const SEMESTER_INITIAL_PRIZE_DB: Record<string, Prize[]> = {
+  bronze: [
+    { name: "基础文具", type: "bronze", prob: 0.4 },
+    { name: "免做一页口算卷", type: "bronze", prob: 0.3 },
+    { name: "点播一首午休歌曲", type: "bronze", prob: 0.3 }
+  ],
+  silver: [
+    { name: "某项常规作业减半", type: "silver", prob: 0.4 },
+    { name: "免做一次改错题", type: "silver", prob: 0.3 },
+    { name: "零食盲袋", type: "silver", prob: 0.3 }
+  ],
+  gold: [
+    { name: "挑选同桌体验权", type: "gold", prob: 0.4 },
+    { name: "数学课代表体验卡", type: "gold", prob: 0.3 },
+    { name: "免做一次周末作业", type: "gold", prob: 0.3 }
+  ]
+};
+
 // --- Helper Functions ---
 const getGroupStatus = (avgStars: number) => {
   if (avgStars >= 15) return { name: "🏆 超级战队", color: "text-amber-700", bg: "bg-gradient-to-r from-amber-100 to-yellow-100" };
@@ -42,7 +79,6 @@ const drawPrize = (items: Prize[]) => {
   
   const rand = Math.random();
   let cumulative = 0;
-  // Normalize probability
   const totalProb = items.reduce((acc, item) => acc + item.prob, 0);
   
   for (const item of items) {
@@ -97,6 +133,10 @@ export default function AppWrapper() {
 function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAppMode: (mode: 'final' | 'semester') => void }) {
   // 数据隔离辅助函数：学期模式下自动为 localStorage 键值添加 _semester 后缀
   const getStorageKey = (key: string) => appMode === 'final' ? key : `${key}_semester`;
+
+  // 动态选择当前模式的配置
+  const currentActionReasons = appMode === 'semester' ? SEMESTER_ACTION_REASONS : ACTION_REASONS;
+  const currentPoolMeta = appMode === 'semester' ? SEMESTER_POOL_METADATA : POOL_METADATA;
 
   const [students, setStudents] = useState<Student[]>(() => {
     const saved = localStorage.getItem(getStorageKey('504_stars_data'));
@@ -156,7 +196,8 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
 
   const [prizes, setPrizes] = useState<PrizeDB>(() => {
       const saved = localStorage.getItem(getStorageKey('504_prize_db'));
-      return saved ? JSON.parse(saved) : INITIAL_PRIZE_DB;
+      if (saved) return JSON.parse(saved);
+      return appMode === 'semester' ? SEMESTER_INITIAL_PRIZE_DB : INITIAL_PRIZE_DB;
   });
   
   const [viewMode, setViewMode] = useState<'dashboard' | 'all_students' | 'redemption' | 'team_manage' | 'admin'>('dashboard');
@@ -197,18 +238,18 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
 
   const totalClassStars = useMemo(() => students.reduce((acc, s) => acc + s.stars, 0), [students]);
 
-  useEffect(() => { localStorage.setItem(getStorageKey('504_stars_data'), JSON.stringify(students)); }, [students, appMode]);
-  useEffect(() => { localStorage.setItem(getStorageKey('504_team_names'), JSON.stringify(teamNames)); }, [teamNames, appMode]);
-  useEffect(() => { localStorage.setItem(getStorageKey('504_team_leaders'), JSON.stringify(leaders)); }, [leaders, appMode]);
-  useEffect(() => { localStorage.setItem(getStorageKey('504_star_logs'), JSON.stringify(starLogs)); }, [starLogs, appMode]);
-  useEffect(() => { localStorage.setItem(getStorageKey('504_lottery_history'), JSON.stringify(lotteryHistory)); }, [lotteryHistory, appMode]);
-  useEffect(() => { localStorage.setItem(getStorageKey('504_pending_prizes'), JSON.stringify(pendingPrizes)); }, [pendingPrizes, appMode]);
-  useEffect(() => { localStorage.setItem(getStorageKey('504_redeemed_history'), JSON.stringify(redeemedHistory)); }, [redeemedHistory, appMode]);
-  useEffect(() => { localStorage.setItem(getStorageKey('504_team_bonuses'), JSON.stringify(teamBonuses)); }, [teamBonuses, appMode]);
-  useEffect(() => { localStorage.setItem(getStorageKey('504_daily_champions'), JSON.stringify(dailyChampions)); }, [dailyChampions, appMode]);
-  useEffect(() => { localStorage.setItem(getStorageKey('504_max_day'), maxDay.toString()); }, [maxDay, appMode]);
-  useEffect(() => { localStorage.setItem(getStorageKey('504_group_config'), JSON.stringify(groupConfig)); }, [groupConfig, appMode]);
-  useEffect(() => { localStorage.setItem(getStorageKey('504_prize_db'), JSON.stringify(prizes)); }, [prizes, appMode]);
+  useEffect(() => { localStorage.setItem(getStorageKey('504_stars_data'), JSON.stringify(students)); }, [students]);
+  useEffect(() => { localStorage.setItem(getStorageKey('504_team_names'), JSON.stringify(teamNames)); }, [teamNames]);
+  useEffect(() => { localStorage.setItem(getStorageKey('504_team_leaders'), JSON.stringify(leaders)); }, [leaders]);
+  useEffect(() => { localStorage.setItem(getStorageKey('504_star_logs'), JSON.stringify(starLogs)); }, [starLogs]);
+  useEffect(() => { localStorage.setItem(getStorageKey('504_lottery_history'), JSON.stringify(lotteryHistory)); }, [lotteryHistory]);
+  useEffect(() => { localStorage.setItem(getStorageKey('504_pending_prizes'), JSON.stringify(pendingPrizes)); }, [pendingPrizes]);
+  useEffect(() => { localStorage.setItem(getStorageKey('504_redeemed_history'), JSON.stringify(redeemedHistory)); }, [redeemedHistory]);
+  useEffect(() => { localStorage.setItem(getStorageKey('504_team_bonuses'), JSON.stringify(teamBonuses)); }, [teamBonuses]);
+  useEffect(() => { localStorage.setItem(getStorageKey('504_daily_champions'), JSON.stringify(dailyChampions)); }, [dailyChampions]);
+  useEffect(() => { localStorage.setItem(getStorageKey('504_max_day'), maxDay.toString()); }, [maxDay]);
+  useEffect(() => { localStorage.setItem(getStorageKey('504_group_config'), JSON.stringify(groupConfig)); }, [groupConfig]);
+  useEffect(() => { localStorage.setItem(getStorageKey('504_prize_db'), JSON.stringify(prizes)); }, [prizes]);
 
   useEffect(() => {
     if (selectedDay > maxDay) {
@@ -444,7 +485,6 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
           const key = `${studentId}-${day}`;
           const currentLog = prev[key] || [];
           return { ...prev, [key]: currentLog.filter(log => {
-              // Handle legacy logs (numbers) safely or objects with id
               if (typeof log === 'object' && log.id) return log.id !== logId;
               return true; 
           }) };
@@ -504,14 +544,12 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
       if (!data) return;
 
       if (type === 'undo') {
-          // Legacy undo logic (removes last item)
           const key = `${data.studentId}-${data.day}`;
           const currentLog = starLogs[key] || [];
           if (currentLog.length > 0) {
               const lastItem = currentLog[currentLog.length - 1];
               const lastAmount = typeof lastItem === 'number' ? lastItem : lastItem.amount;
               
-              // Remove last
               const newLog = currentLog.slice(0, -1);
               setStarLogs(prev => ({ ...prev, [key]: newLog }));
 
@@ -555,12 +593,10 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
   };
 
   const triggerUndo = (student: Student, day: number) => {
-    // Only used in Team View
     const logKey = `${student.id}-${day}`;
     const currentLog = starLogs[logKey] || [];
     if (currentLog.length === 0) return;
     
-    // We pass 0 as amount here because executeConfirm logic will calculate it from the log
     setConfirmModal({
         isOpen: true,
         type: 'undo',
@@ -630,7 +666,7 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
             if (data.pendingPrizes) setPendingPrizes(data.pendingPrizes);
             if (data.redeemedHistory) setRedeemedHistory(data.redeemedHistory); 
             if (data.groupConfig) setGroupConfig(data.groupConfig);
-            if (data.prizes) setPrizes(data.prizes); // Import prizes if available
+            if (data.prizes) setPrizes(data.prizes);
             showNotification('数据恢复成功！🎉');
           }
         } else { showNotification('文件格式错误', 'error'); }
@@ -654,7 +690,7 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
     if (!student) { showNotification('查无此学号', 'error'); return; }
     if (!gachapon.tier) return;
     
-    const cost = POOL_METADATA[gachapon.tier].cost;
+    const cost = currentPoolMeta[gachapon.tier].cost;
     if (student.stars < cost) {
       setGachapon(prev => ({ ...prev, stage: 'denied', studentName: student.name, currentStars: student.stars }));
     } else {
@@ -674,7 +710,7 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
       const newRecord: LotteryRecord = {
         id: Date.now(),
         studentName: gachapon.studentName,
-        tierTitle: POOL_METADATA[gachapon.tier!].title,
+        tierTitle: currentPoolMeta[gachapon.tier!].title,
         prize: prizeItem.name,
         timestamp: new Date().toLocaleString()
       };
@@ -698,7 +734,7 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
 
   const handleAcceptPrize = () => {
     if (!gachapon.tier) return;
-    const cost = POOL_METADATA[gachapon.tier].cost;
+    const cost = currentPoolMeta[gachapon.tier].cost;
     const studentId = parseInt(gachapon.studentId);
     
     setStudents(prev => prev.map(s => {
@@ -793,16 +829,14 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
       reader.readAsDataURL(file);
   };
 
-  // Safely get logs ensuring they are objects or converted numbers
   const getStudentLogs = (studentId: number, day: number) => {
       const logs = starLogs[`${studentId}-${day}`] || [];
       return logs.map(log => {
-          if (typeof log === 'number') return { amount: log, reason: '手动调整', id: Math.random() }; // Legacy fallback
+          if (typeof log === 'number') return { amount: log, reason: '手动调整', id: Math.random() };
           return log;
       });
   };
 
-  // --- Prize Editing Logic ---
   const handlePrizeChange = (poolKey: string, index: number, field: string, value: any) => {
       const newPrizes = { ...prizes };
       const newPool = [...newPrizes[poolKey]];
@@ -847,13 +881,13 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
             {/* 模式切换开关 */}
             <div className="hidden sm:flex bg-slate-100 p-1 rounded-full border border-slate-200 shadow-inner items-center ml-2">
               <button
-                onClick={() => setAppMode('final')}
+                onClick={() => { setAppMode('final'); showNotification('已切换至：期末冲刺版'); }}
                 className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all ${appMode === 'final' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
               >
                 🏁 期末冲刺版
               </button>
               <button
-                onClick={() => setAppMode('semester')}
+                onClick={() => { setAppMode('semester'); showNotification('已切换至：学期常规版'); }}
                 className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center ${appMode === 'semester' ? 'bg-gradient-to-r from-emerald-400 to-teal-500 text-white shadow-md' : 'text-slate-400 hover:text-slate-600'}`}
               >
                 <Sparkles size={12} className="mr-1" /> 学期常规版
@@ -914,7 +948,7 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
         </div>
       </nav>
 
-      {/* Prize Overview Modal (Now with Edit Capability) */}
+      {/* Prize Overview Modal */}
       {showPrizeOverview && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
             <div className="bg-white rounded-3xl p-6 w-full max-w-6xl shadow-2xl relative overflow-hidden flex flex-col max-h-[90vh]">
@@ -943,8 +977,8 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
 
                 <div className="overflow-y-auto flex-1 pr-2 pb-4">
                     <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                        {Object.keys(POOL_METADATA).map((key) => {
-                            const meta = POOL_METADATA[key];
+                        {Object.keys(currentPoolMeta).map((key) => {
+                            const meta = currentPoolMeta[key];
                             const currentPrizes = prizes[key] || [];
                             const totalProb = currentPrizes.reduce((acc, item) => acc + parseFloat(item.prob.toString()), 0);
                             const isValid = Math.abs(totalProb - 1.0) < 0.001;
@@ -1049,15 +1083,15 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
                     {isEditingPrizes ? (
                         <>
                             <div className="flex-1 flex items-center text-xs text-rose-500 font-bold bg-rose-50 px-4 rounded-lg">
-                                {!Object.keys(POOL_METADATA).every(k => Math.abs(prizes[k].reduce((a,b)=>a+parseFloat(b.prob.toString()||"0"),0) - 1) < 0.001) && 
+                                {!Object.keys(currentPoolMeta).every(k => Math.abs((prizes[k] || []).reduce((a,b)=>a+parseFloat(b.prob.toString()||"0"),0) - 1) < 0.001) && 
                                     <span><AlertCircle size={14} className="inline mr-1"/> 无法保存：请确保所有奖池概率总和均为 100%</span>
                                 }
                             </div>
-                            <button onClick={() => { setIsEditingPrizes(false); setPrizes(JSON.parse(localStorage.getItem(getStorageKey('504_prize_db')) || JSON.stringify(INITIAL_PRIZE_DB))); }} className="px-6 py-3 rounded-xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200">
+                            <button onClick={() => { setIsEditingPrizes(false); setPrizes(JSON.parse(localStorage.getItem(getStorageKey('504_prize_db')) || JSON.stringify(appMode === 'semester' ? SEMESTER_INITIAL_PRIZE_DB : INITIAL_PRIZE_DB))); }} className="px-6 py-3 rounded-xl font-bold bg-slate-100 text-slate-600 hover:bg-slate-200">
                                 取消修改
                             </button>
                             <button 
-                                disabled={!Object.keys(POOL_METADATA).every(k => Math.abs(prizes[k].reduce((a,b)=>a+parseFloat(b.prob.toString()||"0"),0) - 1) < 0.001)}
+                                disabled={!Object.keys(currentPoolMeta).every(k => Math.abs((prizes[k] || []).reduce((a,b)=>a+parseFloat(b.prob.toString()||"0"),0) - 1) < 0.001)}
                                 onClick={() => { setIsEditingPrizes(false); showNotification("✅ 奖池配置已保存并生效！"); }} 
                                 className="px-6 py-3 rounded-xl font-bold bg-indigo-600 text-white hover:bg-indigo-700 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                             >
@@ -1072,6 +1106,7 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
         </div>
       )}
 
+      {/* Rules Modal */}
       {showRules && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
             <div className="bg-white rounded-3xl p-6 w-full max-w-2xl shadow-2xl relative overflow-y-auto max-h-[90vh]">
@@ -1080,57 +1115,86 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
                     <div className="inline-flex items-center justify-center p-3 bg-indigo-100 text-indigo-600 rounded-full mb-3">
                         <BookOpen size={32} />
                     </div>
-                    <h2 className="text-2xl font-black text-slate-800">🌟 摘星规则说明书</h2>
+                    <h2 className="text-2xl font-black text-slate-800">🌟 {appMode === 'semester' ? '学期常规版' : '期末冲刺版'} 摘星说明</h2>
                     <p className="text-slate-500 text-sm mt-1">努力就有收获，合作才能共赢！</p>
                 </div>
 
-                <div className="space-y-6">
-                    <div className="bg-emerald-50 rounded-2xl p-5 border border-emerald-100">
-                        <h3 className="font-bold text-emerald-800 text-lg mb-3 flex items-center"><Star className="mr-2 fill-emerald-500 text-emerald-600"/> 第一部分：星星收集（基础篇）</h3>
-                        <ul className="space-y-2 text-sm text-emerald-900 font-medium">
-                            <li className="flex items-start"><span className="bg-emerald-200 text-emerald-800 text-[10px] px-1.5 rounded mr-2 mt-0.5 min-w-fit">每日基础</span> 每日计算全对 + 书写工整 ➡ <span className="font-bold ml-1">+1 颗星</span></li>
-                            <li className="flex items-start"><span className="bg-emerald-200 text-emerald-800 text-[10px] px-1.5 rounded mr-2 mt-0.5 min-w-fit">订正收益</span> 错题在放学前订正并过关 ➡ <span className="font-bold ml-1">+0.5 颗星</span></li>
-                            <li className="flex items-start"><span className="bg-emerald-200 text-emerald-800 text-[10px] px-1.5 rounded mr-2 mt-0.5 min-w-fit">黑马红利</span> 随机突击检查被表扬 / 模拟考进步巨大 ➡ <span className="font-bold ml-1">额外奖励</span></li>
-                        </ul>
-                    </div>
-
-                    <div className="bg-blue-50 rounded-2xl p-5 border border-blue-100">
-                        <h3 className="font-bold text-blue-800 text-lg mb-3 flex items-center"><Users className="mr-2 fill-blue-400 text-blue-600"/> 第二部分：战队团战（怎么分红？）</h3>
-                        <p className="text-xs text-blue-600 mb-3 italic">“一个人富不算富，全组富才是真的富！”</p>
-                        <ul className="space-y-2 text-sm text-blue-900 font-medium">
-                            <li className="flex items-start">
-                                <div className="bg-blue-200 text-blue-800 text-[10px] px-1.5 rounded mr-2 mt-0.5 min-w-fit whitespace-nowrap">🏆 共同富裕奖</div>
-                                <div>如果小组4人当天作业全部全对（全员1星），战队挂上“超级战队”徽章，每个人<span className="font-bold ml-1">额外奖励 0.5 星！</span></div>
-                            </li>
-                            <li className="flex items-start">
-                                <div className="bg-rose-200 text-rose-800 text-[10px] px-1.5 rounded mr-2 mt-0.5 min-w-fit whitespace-nowrap">⚠️ “破产”警告</div>
-                                <div>只要组里有一个人作业没交，全组当天的战队积分为 0。</div>
-                            </li>
-                        </ul>
-                    </div>
-
-                    <div className="bg-purple-50 rounded-2xl p-5 border border-purple-100">
-                        <h3 className="font-bold text-purple-800 text-lg mb-3 flex items-center"><Gift className="mr-2 fill-purple-400 text-purple-600"/> 第三部分：消费与诱惑（怎么花星？）</h3>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                            <div className="bg-white p-3 rounded-xl border border-purple-100 shadow-sm">
-                                <div className="font-bold text-pink-600 mb-1">🎁 5星（惊喜盲盒）</div>
-                                <div className="text-slate-600 text-xs">换点小零食、来点小互动</div>
-                            </div>
-                            <div className="bg-white p-3 rounded-xl border border-purple-100 shadow-sm">
-                                <div className="font-bold text-violet-600 mb-1">🔮 10星（魔法宝箱）</div>
-                                <div className="text-slate-600 text-xs">换取“免死金牌”、“计算器使用权”！</div>
-                            </div>
-                            <div className="bg-white p-3 rounded-xl border border-purple-100 shadow-sm">
-                                <div className="font-bold text-amber-600 mb-1">👑 15星（传说宝藏）</div>
-                                <div className="text-slate-600 text-xs">终极大奖——“免做假期作业”、“金老师请客”！</div>
-                            </div>
-                            <div className="bg-white p-3 rounded-xl border border-purple-100 shadow-sm relative overflow-hidden">
-                                <div className="font-bold text-indigo-600 mb-1">🌌 7星（命运宝箱）</div>
-                                <div className="text-slate-600 text-xs">勇敢者游戏！可能抽到大奖，也可能是“天选打工人”、“自带BGM”等惩罚！</div>
+                {appMode === 'semester' ? (
+                    <div className="space-y-6">
+                        <div className="bg-emerald-50 rounded-2xl p-5 border border-emerald-100">
+                            <h3 className="font-bold text-emerald-800 text-lg mb-3 flex items-center"><Star className="mr-2 fill-emerald-500 text-emerald-600"/> 第一部分：如何赚取星星？</h3>
+                            <ul className="space-y-2 text-sm text-emerald-900 font-medium">
+                                <li className="flex items-start"><span className="bg-emerald-200 text-emerald-800 text-[10px] px-1.5 rounded mr-2 mt-0.5 min-w-fit">基础保底</span> 作业全对、卷面极佳、订正及时 ➡ <span className="font-bold ml-1">+1 颗星</span></li>
+                                <li className="flex items-start"><span className="bg-emerald-200 text-emerald-800 text-[10px] px-1.5 rounded mr-2 mt-0.5 min-w-fit">思维进阶</span> 攻克每周一题、提出优质问题、一题多解 ➡ <span className="font-bold ml-1">+3 颗星</span></li>
+                                <li className="flex items-start"><span className="bg-emerald-200 text-emerald-800 text-[10px] px-1.5 rounded mr-2 mt-0.5 min-w-fit">高光时刻</span> 测验满分/大进步、担任小老师 ➡ <span className="font-bold ml-1">+5 颗星</span></li>
+                            </ul>
+                        </div>
+                        <div className="bg-purple-50 rounded-2xl p-5 border border-purple-100">
+                            <h3 className="font-bold text-purple-800 text-lg mb-3 flex items-center"><Gift className="mr-2 fill-purple-400 text-purple-600"/> 第二部分：星际盲盒（怎么花星？）</h3>
+                            <div className="grid grid-cols-1 gap-3 text-sm">
+                                <div className="bg-white p-3 rounded-xl border border-purple-100 shadow-sm flex items-center justify-between">
+                                    <div>
+                                        <div className="font-bold text-slate-600 mb-1">📦 星尘补给袋 (20星)</div>
+                                        <div className="text-slate-500 text-xs">基础奖励包，人人可及。</div>
+                                    </div>
+                                </div>
+                                <div className="bg-white p-3 rounded-xl border border-purple-100 shadow-sm flex items-center justify-between">
+                                    <div>
+                                        <div className="font-bold text-indigo-600 mb-1">🌌 银河寻宝图 (40星)</div>
+                                        <div className="text-slate-500 text-xs">进阶特权奖励，需要持续努力。</div>
+                                    </div>
+                                </div>
+                                <div className="bg-white p-3 rounded-xl border border-purple-100 shadow-sm flex items-center justify-between">
+                                    <div>
+                                        <div className="font-bold text-amber-600 mb-1">👑 宇宙主宰匣 (60星)</div>
+                                        <div className="text-slate-500 text-xs">终极特权，强者的证明！</div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
-                </div>
+                ) : (
+                    <div className="space-y-6">
+                        <div className="bg-emerald-50 rounded-2xl p-5 border border-emerald-100">
+                            <h3 className="font-bold text-emerald-800 text-lg mb-3 flex items-center"><Star className="mr-2 fill-emerald-500 text-emerald-600"/> 第一部分：星星收集（基础篇）</h3>
+                            <ul className="space-y-2 text-sm text-emerald-900 font-medium">
+                                <li className="flex items-start"><span className="bg-emerald-200 text-emerald-800 text-[10px] px-1.5 rounded mr-2 mt-0.5 min-w-fit">每日基础</span> 每日计算全对 + 书写工整 ➡ <span className="font-bold ml-1">+1 颗星</span></li>
+                                <li className="flex items-start"><span className="bg-emerald-200 text-emerald-800 text-[10px] px-1.5 rounded mr-2 mt-0.5 min-w-fit">订正收益</span> 错题在放学前订正并过关 ➡ <span className="font-bold ml-1">+0.5 颗星</span></li>
+                                <li className="flex items-start"><span className="bg-emerald-200 text-emerald-800 text-[10px] px-1.5 rounded mr-2 mt-0.5 min-w-fit">黑马红利</span> 随机突击检查被表扬 / 模拟考进步巨大 ➡ <span className="font-bold ml-1">额外奖励</span></li>
+                            </ul>
+                        </div>
+                        <div className="bg-blue-50 rounded-2xl p-5 border border-blue-100">
+                            <h3 className="font-bold text-blue-800 text-lg mb-3 flex items-center"><Users className="mr-2 fill-blue-400 text-blue-600"/> 第二部分：战队团战（怎么分红？）</h3>
+                            <ul className="space-y-2 text-sm text-blue-900 font-medium">
+                                <li className="flex items-start">
+                                    <div className="bg-blue-200 text-blue-800 text-[10px] px-1.5 rounded mr-2 mt-0.5 min-w-fit whitespace-nowrap">🏆 共同富裕奖</div>
+                                    <div>如果小组4人当天作业全部全对，每个人<span className="font-bold ml-1">额外奖励 0.5 星！</span></div>
+                                </li>
+                            </ul>
+                        </div>
+                        <div className="bg-purple-50 rounded-2xl p-5 border border-purple-100">
+                            <h3 className="font-bold text-purple-800 text-lg mb-3 flex items-center"><Gift className="mr-2 fill-purple-400 text-purple-600"/> 第三部分：消费与诱惑（怎么花星？）</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                                <div className="bg-white p-3 rounded-xl border border-purple-100 shadow-sm">
+                                    <div className="font-bold text-pink-600 mb-1">🎁 5星（惊喜盲盒）</div>
+                                    <div className="text-slate-600 text-xs">换点小零食、来点小互动</div>
+                                </div>
+                                <div className="bg-white p-3 rounded-xl border border-purple-100 shadow-sm">
+                                    <div className="font-bold text-violet-600 mb-1">🔮 10星（魔法宝箱）</div>
+                                    <div className="text-slate-600 text-xs">换取“免死金牌”、“计算器使用权”！</div>
+                                </div>
+                                <div className="bg-white p-3 rounded-xl border border-purple-100 shadow-sm">
+                                    <div className="font-bold text-amber-600 mb-1">👑 15星（传说宝藏）</div>
+                                    <div className="text-slate-600 text-xs">终极大奖——“免做假期作业”、“金老师请客”！</div>
+                                </div>
+                                <div className="bg-white p-3 rounded-xl border border-purple-100 shadow-sm relative overflow-hidden">
+                                    <div className="font-bold text-indigo-600 mb-1">🌌 7星（命运宝箱）</div>
+                                    <div className="text-slate-600 text-xs">勇敢者游戏！可能抽到大奖，也可能是惩罚！</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
                 
                 <div className="mt-6 text-center">
                     <button onClick={() => setShowRules(false)} className="bg-slate-800 text-white font-bold py-3 px-8 rounded-xl shadow-lg hover:bg-slate-700 transition-all active:scale-95">我明白了，去摘星！🚀</button>
@@ -1221,7 +1285,6 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
             <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl relative flex flex-col max-h-[90vh] overflow-hidden">
                 <button onClick={() => { setSelectedStudentForAction(null); setPendingAction(null); }} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 bg-slate-50 p-1 rounded-full z-20"><X size={20} /></button>
                 
-                {/* Fixed Header */}
                 <div className="text-center pt-6 px-6 pb-4 flex-shrink-0 bg-white z-10 shadow-sm border-b border-slate-50">
                     <div 
                         className="inline-block relative group cursor-pointer"
@@ -1256,10 +1319,7 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
                     </div>
                 </div>
 
-                {/* Scrollable Content: Actions + Logs */}
                 <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
-                    
-                    {/* Action Buttons Box */}
                     <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 shadow-sm">
                         <div className="flex justify-between items-center mb-3">
                             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">今日得分 (第 {selectedDay} 天)</span>
@@ -1268,7 +1328,7 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
                         
                         {!pendingAction ? (
                             <div className="grid grid-cols-2 gap-3">
-                                {ACTION_REASONS.map((action, idx) => (
+                                {currentActionReasons.map((action, idx) => (
                                     <button
                                         key={idx}
                                         onClick={() => setPendingAction(action)}
@@ -1314,7 +1374,6 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
                         )}
                     </div>
 
-                    {/* Log History Box */}
                     <div className="bg-slate-50/80 rounded-xl border border-slate-200 p-4">
                         <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center"><History size={12} className="mr-1"/> 📝 今日记录明细</h4>
                         <div className="space-y-2">
@@ -1343,7 +1402,6 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
                     </div>
                 </div>
 
-                {/* Fixed Footer */}
                 <div className="p-6 pt-4 pb-6 flex-shrink-0 bg-white z-10 border-t border-slate-100 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
                     <div className="flex gap-2">
                         <button onClick={() => { updateScoreDirectly(selectedStudentForAction.id, selectedDay, 0); showNotification(`已重置 ${selectedStudentForAction.name} 今日得分`); }} className="flex-1 py-3 bg-slate-100 text-slate-500 font-bold rounded-xl hover:bg-slate-200 transition-colors flex items-center justify-center">
@@ -1367,11 +1425,11 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
             <div className="text-center space-y-6 pt-2">
               {gachapon.stage !== 'result' && (
                 <div className="animate-in slide-in-from-top duration-500">
-                  <div className={`inline-flex items-center justify-center p-4 rounded-2xl bg-gradient-to-br ${POOL_METADATA[gachapon.tier].gradient} text-white mb-3 shadow-lg shadow-indigo-100`}>
-                    <TierIconWrapper icon={POOL_METADATA[gachapon.tier].icon} size={40} />
+                  <div className={`inline-flex items-center justify-center p-4 rounded-2xl bg-gradient-to-br ${currentPoolMeta[gachapon.tier].gradient} text-white mb-3 shadow-lg shadow-indigo-100`}>
+                    <TierIconWrapper icon={currentPoolMeta[gachapon.tier].icon} size={40} />
                   </div>
-                  <h3 className="text-2xl font-black text-slate-800">{POOL_METADATA[gachapon.tier].title}</h3>
-                  <div className="inline-block px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-500 mt-2">✨ 消耗 {POOL_METADATA[gachapon.tier].cost} 颗星 ✨</div>
+                  <h3 className="text-2xl font-black text-slate-800">{currentPoolMeta[gachapon.tier].title}</h3>
+                  <div className="inline-block px-3 py-1 bg-slate-100 rounded-full text-xs font-bold text-slate-500 mt-2">✨ 消耗 {currentPoolMeta[gachapon.tier].cost} 颗星 ✨</div>
                 </div>
               )}
               
@@ -1395,7 +1453,7 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
                     <div className="text-4xl mb-2">😢</div>
                     <h4 className="text-lg font-bold text-gray-800 mb-1">{gachapon.studentName} 同学</h4>
                     <p className="text-rose-500 font-bold">星星数量不足哦！</p>
-                    <div className="mt-4 text-xs text-rose-400 bg-white inline-block px-3 py-1 rounded-full shadow-sm border border-rose-100">当前: {gachapon.currentStars} / 需要: {POOL_METADATA[gachapon.tier].cost}</div>
+                    <div className="mt-4 text-xs text-rose-400 bg-white inline-block px-3 py-1 rounded-full shadow-sm border border-rose-100">当前: {gachapon.currentStars} / 需要: {currentPoolMeta[gachapon.tier].cost}</div>
                   </div>
                   <button onClick={closeGachapon} className="w-full py-3 rounded-xl font-bold bg-gray-100 text-gray-500 hover:bg-gray-200 transition-all">我会继续努力的！</button>
                 </div>
@@ -1414,7 +1472,7 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
 
               {/* Spinning */}
               {gachapon.stage === 'spinning' && (
-                 <div className="relative h-48 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center"><div className="animate-shake relative"><Gift size={80} className={`${POOL_METADATA[gachapon.tier].color}`} fill="currentColor" fillOpacity={0.2} /><div className="absolute -top-2 -right-2 text-yellow-400 animate-ping"><Zap size={24} fill="currentColor" /></div></div><div className="mt-4 text-lg font-black text-slate-400 animate-pulse">好运抽取中...</div></div>
+                 <div className="relative h-48 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 flex flex-col items-center justify-center"><div className="animate-shake relative"><Gift size={80} className={`${currentPoolMeta[gachapon.tier].iconColor}`} fill="currentColor" fillOpacity={0.2} /><div className="absolute -top-2 -right-2 text-yellow-400 animate-ping"><Zap size={24} fill="currentColor" /></div></div><div className="mt-4 text-lg font-black text-slate-400 animate-pulse">好运抽取中...</div></div>
               )}
 
               {/* Result */}
@@ -1500,7 +1558,6 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
                                     </div>
                                 </div>
                                 <div className="flex flex-col items-end">
-                                    {/* Set Leader Button */}
                                     <button 
                                         onClick={() => triggerSetLeader(student, activeGroup.id)} 
                                         className={`mb-1 p-1 rounded-full transition-colors ${isLeader ? 'text-red-400 hover:bg-red-50' : 'text-gray-300 hover:text-yellow-500 hover:bg-yellow-50'}`} 
@@ -1524,7 +1581,6 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
                                       <span>历史: <span className="text-amber-600 font-black">{totalEarned}</span></span>
                                   </div>
                                   <div className="flex space-x-2">
-                                    {/* Undo & Reset Trigger Buttons */}
                                     {hasHistory && (
                                         <button onClick={() => triggerUndo(student, selectedDay)} className="text-[10px] bg-white border border-rose-200 text-rose-500 px-2 py-1 rounded-md flex items-center font-bold hover:bg-rose-50 transition-colors shadow-sm"><Undo2 size={12} className="mr-1"/> 撤回</button>
                                     )}
@@ -1552,7 +1608,6 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
       )}
 
       {/* Main Content Areas */}
-      
       <main className="max-w-5xl mx-auto p-4 mt-6 relative z-10">
         {viewMode === 'redemption' ? (
             <div className="animate-in fade-in zoom-in duration-500 pb-20">
@@ -1621,7 +1676,6 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
                             </div>
                         )}
 
-                        {/* Redeemed History Section */}
                         <div className="mt-8 border-t-2 border-dashed border-slate-200 pt-6">
                             <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center">
                                 <History size={16} className="mr-2"/> 最近已兑换 (点击撤回)
@@ -1798,7 +1852,6 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
                                             onClick={() => setSelectedStudentForAction(student)}
                                             className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 flex flex-col items-center justify-center hover:shadow-md hover:border-indigo-300 hover:-translate-y-1 transition-all group relative overflow-hidden"
                                         >
-                                            {/* Rank Badge (only in stars mode) */}
                                             {sortMode === 'stars' && (
                                                 <div className={`absolute top-2 left-2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold shadow-sm z-20 ${
                                                     rank === 1 ? 'bg-yellow-400 text-white ring-2 ring-yellow-200' :
@@ -1848,7 +1901,6 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
                 <div className="absolute -top-10 -right-10 w-40 h-40 bg-purple-400 rounded-full blur-3xl opacity-30 animate-pulse"></div>
                 <div className="absolute -bottom-10 -left-10 w-40 h-40 bg-indigo-400 rounded-full blur-3xl opacity-30 animate-pulse delay-1000"></div>
                 
-                {/* 日期导航控制栏 */}
                 <div className="flex justify-between items-center mb-6 relative z-20">
                     <button 
                         onClick={handlePrevDay} 
@@ -1892,14 +1944,12 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
                 <h2 className="text-xl sm:text-2xl font-bold mb-2 relative z-10 tracking-tight opacity-90 uppercase flex items-center justify-center"><Rocket size={20} className="mr-2"/> 504班 · 荣耀殿堂</h2>
                 <div className="text-7xl sm:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-b from-yellow-200 to-yellow-500 drop-shadow-lg my-6 flex justify-center items-center relative z-10 animate-pulse-glow">
                   <Star size={64} className="fill-yellow-400 text-yellow-600 mr-4 animate-spin-slow drop-shadow-lg" />
-                  {/* 使用预先计算的 totalClassStars，避免在 render 中调用 hook */}
                   {totalClassStars}
                 </div>
                 <p className="text-lg sm:text-xl font-medium relative z-10 bg-white/10 backdrop-blur-md inline-block px-8 py-2 rounded-full border border-white/20">
                   ✨ 聚沙成塔 · 汇星成河 · 504班势不可挡！ ✨
                 </p>
 
-                {/* Champion Section */}
                 <div className="mt-6 pt-6 border-t border-white/20 relative z-20 flex flex-col items-center gap-4">
                     {dailyChampions[selectedDay] ? (
                       <div className="animate-pop text-center">
@@ -1925,7 +1975,6 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
             <div>
               <div className="flex items-center justify-between mb-6 px-2">
                 <h2 className="text-2xl font-black text-slate-800 flex items-center"><TrendingUp className="mr-3 text-indigo-500" size={28}/> 战队龙虎榜</h2>
-                {/* 移动到这里的全员加星按钮 */}
                 <div className="flex items-center gap-2">
                     <button 
                         onClick={() => setIsBatchAddOpen(true)}
@@ -1998,16 +2047,14 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
                 <div className="text-sm font-medium text-slate-400 flex items-center bg-white px-3 py-1.5 rounded-full shadow-sm border border-slate-100">👆 点击开启扭蛋</div>
               </div>
               
-              {/* Prize Grid: 3 columns for main tiers */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-6">
-                {['bronze', 'silver', 'gold'].map((key) => {
-                  const meta = POOL_METADATA[key];
+                {Object.keys(currentPoolMeta).filter(key => key !== 'destiny').map((key) => {
+                  const meta = currentPoolMeta[key];
                   const poolItems = prizes[key] || [];
                   return (
                     <button key={key} onClick={() => openGachapon(key)} className={`relative bg-white p-6 rounded-3xl shadow-lg border-2 ${meta.shadow} border-white hover:-translate-y-2 hover:shadow-2xl transition-all duration-300 text-center group overflow-hidden`}>
                       <div className={`absolute top-0 left-0 w-full h-2 bg-gradient-to-r ${meta.gradient}`}></div>
                       
-                      {/* Dynamic Icon Animations */}
                       {key === 'bronze' && <div className="absolute top-4 right-4 text-pink-200 animate-bounce"><HelpCircle size={16} /></div>}
                       {key === 'silver' && (
                           <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500">
@@ -2016,7 +2063,6 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
                           </div>
                       )}
                       {key === 'gold' && <div className="absolute -top-10 -right-10 w-32 h-32 bg-yellow-100 rounded-full opacity-0 group-hover:opacity-50 transition-opacity blur-2xl"></div>}
-
 
                       <div className={`relative inline-flex items-center justify-center p-4 rounded-2xl bg-gradient-to-br ${meta.gradient} text-white mb-4 shadow-md z-10 group-hover:scale-110 transition-transform duration-300 ${key === 'bronze' ? 'group-hover:animate-wiggle' : ''} ${key === 'gold' ? 'group-hover:animate-pulse-glow' : ''}`}>
                           <TierIconWrapper icon={meta.icon} size={32} />
@@ -2033,7 +2079,6 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
                       </div>
                       <div className={`mt-4 text-xs font-bold text-white bg-gradient-to-r ${meta.gradient} py-3 rounded-xl shadow-md group-hover:shadow-lg transition-all active:scale-95`}>
                           <span className="relative z-10">点击抽奖</span>
-                          {/* Gold Shine */}
                           {key === 'gold' && <div className="absolute top-0 -left-[100%] w-full h-full bg-gradient-to-r from-transparent via-white/30 to-transparent skew-x-12 group-hover:animate-[shimmer_1.5s_infinite]"></div>}
                       </div>
                     </button>
@@ -2041,32 +2086,32 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
                 })}
               </div>
 
-              {/* Destiny Chest: Full width row */}
-              <div className="w-full">
-                 <button 
-                    onClick={() => openGachapon('destiny')} 
-                    className={`relative w-full bg-white p-6 rounded-3xl shadow-lg border-2 ${POOL_METADATA.destiny.shadow} border-white hover:-translate-y-2 hover:shadow-2xl transition-all duration-300 text-center group overflow-hidden flex flex-col items-center justify-center`}
-                  >
-                    <div className={`absolute top-0 left-0 w-full h-2 bg-gradient-to-r ${POOL_METADATA.destiny.gradient}`}></div>
-                    {/* Decorative Elements */}
-                    <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-cyan-100 rounded-full opacity-50 blur-xl"></div>
-                    <div className="absolute top-4 right-10 text-cyan-200 animate-pulse delay-700"><Star size={24} /></div>
+              {appMode === 'final' && currentPoolMeta.destiny && (
+                  <div className="w-full">
+                     <button 
+                        onClick={() => openGachapon('destiny')} 
+                        className={`relative w-full bg-white p-6 rounded-3xl shadow-lg border-2 ${currentPoolMeta.destiny.shadow} border-white hover:-translate-y-2 hover:shadow-2xl transition-all duration-300 text-center group overflow-hidden flex flex-col items-center justify-center`}
+                      >
+                        <div className={`absolute top-0 left-0 w-full h-2 bg-gradient-to-r ${currentPoolMeta.destiny.gradient}`}></div>
+                        <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-cyan-100 rounded-full opacity-50 blur-xl"></div>
+                        <div className="absolute top-4 right-10 text-cyan-200 animate-pulse delay-700"><Star size={24} /></div>
 
-                    <div className="flex flex-col sm:flex-row items-center gap-6 relative z-10">
-                      <div className={`relative inline-flex items-center justify-center p-5 rounded-2xl bg-gradient-to-br ${POOL_METADATA.destiny.gradient} text-white shadow-md z-10 group-hover:rotate-12 transition-transform duration-500`}>
-                          <TierIconWrapper icon={POOL_METADATA.destiny.icon} size={40} />
-                      </div>
-                      <div className="text-center sm:text-left">
-                         <div className={`text-2xl font-black text-slate-800 mb-1`}>{POOL_METADATA.destiny.title}</div>
-                         <div className="text-sm font-bold text-cyan-500 uppercase tracking-widest mb-1">{POOL_METADATA.destiny.slogan}</div>
-                         <div className="text-xs text-slate-400">需 {POOL_METADATA.destiny.cost} 颗星 · 包含全服奖品 + 30% 搞怪惩罚！</div>
-                      </div>
-                      <div className={`mt-4 sm:mt-0 px-8 py-3 text-sm font-bold text-white bg-gradient-to-r ${POOL_METADATA.destiny.gradient} rounded-xl shadow-md group-hover:shadow-lg transition-all active:scale-95`}>
-                          挑战命运 (概率一览: 👑10% | 🔮20% | 🎁40% | 🤡30%)
-                      </div>
-                    </div>
-                  </button>
-              </div>
+                        <div className="flex flex-col sm:flex-row items-center gap-6 relative z-10">
+                          <div className={`relative inline-flex items-center justify-center p-5 rounded-2xl bg-gradient-to-br ${currentPoolMeta.destiny.gradient} text-white shadow-md z-10 group-hover:rotate-12 transition-transform duration-500`}>
+                              <TierIconWrapper icon={currentPoolMeta.destiny.icon} size={40} />
+                          </div>
+                          <div className="text-center sm:text-left">
+                             <div className={`text-2xl font-black text-slate-800 mb-1`}>{currentPoolMeta.destiny.title}</div>
+                             <div className="text-sm font-bold text-cyan-500 uppercase tracking-widest mb-1">{currentPoolMeta.destiny.slogan}</div>
+                             <div className="text-xs text-slate-400">需 {currentPoolMeta.destiny.cost} 颗星 · 包含全服奖品 + 30% 搞怪惩罚！</div>
+                          </div>
+                          <div className={`mt-4 sm:mt-0 px-8 py-3 text-sm font-bold text-white bg-gradient-to-r ${currentPoolMeta.destiny.gradient} rounded-xl shadow-md group-hover:shadow-lg transition-all active:scale-95`}>
+                              挑战命运 (概率一览: 👑10% | 🔮20% | 🎁40% | 🤡30%)
+                          </div>
+                        </div>
+                      </button>
+                  </div>
+              )}
             </div>
 
             {/* Lucky History Ticker */}
@@ -2093,7 +2138,6 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
                 )}
               </div>
               
-              {/* Encouragement Footer */}
               <div className="mt-4 flex items-center justify-center p-3 bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl border border-yellow-100">
                 <Megaphone size={18} className="text-orange-500 mr-2 animate-bounce" />
                 <span className="text-sm font-bold text-orange-700 tracking-wide">越努力，越幸运！下一位传说级锦鲤就是你！</span>
@@ -2102,13 +2146,11 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
           </div>
         ) : (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
-            {/* 管理员界面保持专业简洁，但增加圆角和阴影一致性 */}
             <div className="bg-white p-6 rounded-3xl shadow-lg border border-indigo-100 flex flex-col md:flex-row justify-between items-center gap-4">
               <div>
                 <h2 className="text-2xl font-black text-slate-800 flex items-center"><Edit2 className="mr-2 text-indigo-500"/> 成绩录入控制台</h2>
                 <p className="text-sm text-slate-500 mt-1">当前操作日期：<span className="font-bold text-indigo-600">第 {selectedDay} 天</span></p>
                 
-                {/* 新增：战队管理入口 */}
                 <button 
                     onClick={() => setViewMode('team_manage')}
                     className="mt-2 text-xs bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-3 py-1.5 rounded-lg font-bold flex items-center w-fit transition-colors"
@@ -2129,7 +2171,6 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
               <button onClick={() => batchSetScore(0)} className="flex-shrink-0 px-6 py-3 bg-rose-100 text-rose-700 font-bold rounded-xl border border-rose-200 hover:bg-rose-200 transition-colors shadow-sm active:scale-95 flex items-center"><RotateCcw size={18} className="mr-2"/> 重置当天</button>
             </div>
 
-            {/* 备份功能区保留，作为工具箱 */}
             <div className="bg-indigo-50 p-6 rounded-3xl border border-indigo-100 relative overflow-hidden">
                 <div className="absolute top-0 right-0 -mt-4 -mr-4 w-24 h-24 bg-indigo-200 rounded-full opacity-50 blur-xl"></div>
                 <h3 className="text-sm font-bold text-indigo-800 mb-4 flex items-center relative z-10"><Save size={18} className="mr-2"/> 数据安全中心</h3>
@@ -2156,7 +2197,6 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
                       </div>
                     </div>
                     
-                    {/* 新增：今日与历史统计栏 */}
                     <div className="flex justify-between items-center bg-slate-50 rounded-lg px-3 py-2 text-xs text-slate-500">
                         <div className="flex items-center">
                             <span className="mr-1">📅 今日:</span>
@@ -2175,7 +2215,7 @@ function AppCore({ appMode, setAppMode }: { appMode: 'final' | 'semester', setAp
           </div>
         )}
       </main>
-      <footer className="text-center text-slate-400 text-xs py-8 font-medium relative z-10"><p>浙江师范大学附属杭州笕文实验学校 504班专属</p><p className="opacity-70 mt-1">Design by 金老师 & AI Assistant</p></footer>
+      <footer className="text-center text-slate-400 text-xs py-8 font-medium relative z-10"><p>速度与激情 (Speed and Passion) 504班专属</p><p className="opacity-70 mt-1">Design by 金老师 & AI Assistant</p></footer>
     </div>
   );
 }
